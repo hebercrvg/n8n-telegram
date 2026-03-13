@@ -1,0 +1,180 @@
+{
+  "name": "Telegram Weather Bot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "queue",
+              "value": "={{$json[\"message\"][\"text\"].trim().toLowerCase().normalize(\"NFD\").replace(/[\u0300-\u036f]/g, \"\")}}"
+            },
+            {
+              "name": "chatId",
+              "value": "={{$json[\"message\"][\"chat\"][\"id\"]}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-queue",
+      "name": "Set queue",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "https://api.openweathermap.org/data/2.5/weather",
+        "sendQuery": true,
+        "queryParametersUi": {
+          "parameter": [
+            { "name": "q", "value": "={{$json[\"queue\"]}}" },
+            { "name": "units", "value": "metric" },
+            { "name": "lang", "value": "pt_br" },
+            { "name": "appid", "value": "={{$env.OPENWEATHER_API_KEY}}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "openweather-request",
+      "name": "OpenWeather Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [640, 300],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{!!$json[\"main\"]}}",
+              "operation": "equal",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-success",
+      "name": "IF Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$node[\"Set queue\"].json[\"chatId\"]}}",
+        "text": "=\uD83C\uDF24\uFE0F A temperatura em {{$json[\"name\"]}} \u00e9 de {{Math.round($json[\"main\"][\"temp\"])}}°C.\n\uD83D\uDCA7 Umidade: {{$json[\"main\"][\"humidity\"]}}%\n\uD83C\uDF2C\uFE0F Vento: {{$json[\"wind\"][\"speed\"]}} m/s\n\uD83C\uDF25\uFE0F {{$json[\"weather\"][0][\"description\"]}}",
+        "additionalFields": {}
+      },
+      "id": "telegram-send-success",
+      "name": "Telegram Send Success",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1080, 180],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$node[\"Set queue\"].json[\"chatId\"]}}",
+        "text": "❌ Cidade não encontrada. Use o formato Cidade,UF (ex.: São Paulo,SP).",
+        "additionalFields": {}
+      },
+      "id": "telegram-send-error",
+      "name": "Telegram Send Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1080, 420],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set queue": {
+      "main": [
+        [
+          {
+            "node": "OpenWeather Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenWeather Request": {
+      "main": [
+        [
+          {
+            "node": "IF Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Success": {
+      "main": [
+        [
+          {
+            "node": "Telegram Send Success",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Send Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {},
+  "tags": ["telegram", "weather", "openweather", "chatbot"]
+}

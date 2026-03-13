@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=admin
+      - N8N_BASIC_AUTH_PASSWORD=admin
+      - N8N_PORT=5678
+      - N8N_HOST=0.0.0.0
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      # Overrides the Telegram credential token at runtime on every start.
+      # Keeps the credential in sync if TELEGRAM_BOT_TOKEN changes in .env.
+      - N8N_CREDENTIALS_OVERWRITE_DATA={"telegramApi":{"accessToken":"${TELEGRAM_BOT_TOKEN}"}}
+    volumes:
+      - ./n8n:/home/node/.n8n
+      - ./docker-entrypoint.sh:/docker-entrypoint.sh:ro
+      - ./workflow-telegram-chatbot.json:/workflow-telegram-chatbot.json:ro
+    entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+    env_file:
+      - .env
