@@ -52,22 +52,38 @@ Com o container rodando, envie uma mensagem para o seu bot no Telegram com o nom
 ```
 São Paulo
 Rio de Janeiro
-Belo Horizonte,BR
+Belo Horizonte
 ```
 
 **Resposta de sucesso:**
 
 ```
-🌤️ A temperatura em Belo Horizonte é de 25°C.
+🌤️ Previsão para Belo Horizonte:
+
+🌡️ Temperatura: 25°C
+🤔 Sensação Térmica: 23°C
+⬇️ Mín: 20°C  |  ⬆️ Máx: 28°C
 💧 Umidade: 60%
-🌬️ Vento: 3.5 m/s
+🌬️ Vento: 4 m/s
 🌥️ céu limpo
 ```
 
-**Resposta de erro (cidade não encontrada):**
+**Resposta de erro — cidade não encontrada:**
 
 ```
-❌ Cidade não encontrada. Use o formato Cidade,UF (ex.: São Paulo,SP).
+❌ Cidade não encontrada. Tente novamente com o nome correto (ex.: São Paulo ou Rio de Janeiro).
+```
+
+**Resposta de erro — entrada inválida (vazia, apenas números ou texto longo demais):**
+
+```
+⚠️ Entrada inválida. Digite apenas o nome de uma cidade (ex.: São Paulo).
+```
+
+**Resposta de erro — problema na API (ex.: chave inválida):**
+
+```
+⚠️ Erro ao consultar a API de clima (código: 401). Verifique sua chave de API e tente novamente.
 ```
 
 ---
@@ -76,14 +92,16 @@ Belo Horizonte,BR
 
 O workflow contém os seguintes nós em sequência:
 
-| Nó                        | Tipo              | Descrição                                                                           |
-| ------------------------- | ----------------- | ----------------------------------------------------------------------------------- |
-| **Telegram Trigger**      | `telegramTrigger` | Recebe mensagens de texto do bot via long-polling                                   |
-| **Set queue**             | `set`             | Captura o texto em `queue` (trim + lowercase + remove acentos) e o `chatId`         |
-| **OpenWeather Request**   | `httpRequest`     | Consulta `api.openweathermap.org/data/2.5/weather` com `OPENWEATHER_API_KEY` do env |
-| **IF Success**            | `if`              | Verifica se o campo `main` existe na resposta (cidade encontrada)                   |
-| **Telegram Send Success** | `telegram`        | Envia a temperatura formatada ao usuário                                            |
-| **Telegram Send Error**   | `telegram`        | Envia mensagem de erro ao usuário                                                   |
+| Nó                                 | Tipo              | Descrição                                                                                       |
+| ---------------------------------- | ----------------- | ----------------------------------------------------------------------------------------------- |
+| **Telegram Trigger**               | `telegramTrigger` | Recebe mensagens de texto do bot via long-polling                                               |
+| **Set queue**                      | `set`             | Captura o texto em `queue` (trim + lowercase + remove acentos) e o `chatId`                     |
+| **IF Input Valid**                 | `if`              | Rejeita inputs vazios, numéricos ou com mais de 100 caracteres antes de chamar a API            |
+| **Telegram Send Validation Error** | `telegram`        | Informa ao usuário que a entrada é inválida (caminho `false` do IF Input Valid)                 |
+| **OpenWeather Request**            | `httpRequest`     | Consulta `api.openweathermap.org/data/2.5/weather` com `OPENWEATHER_API_KEY` do env             |
+| **IF Success**                     | `if`              | Verifica se `cod === 200` na resposta (distingue sucesso de erros 404/401)                      |
+| **Telegram Send Success**          | `telegram`        | Envia previsão formatada em HTML (temp, sensação, mín/máx, umidade, vento, descrição)           |
+| **Telegram Send Error**            | `telegram`        | Envia mensagem de erro contextual — cidade não encontrada (404) ou problema de API (401/outros) |
 
 ---
 

@@ -24,11 +24,11 @@
           "string": [
             {
               "name": "queue",
-              "value": "={{$json[\"message\"][\"text\"].trim().toLowerCase().normalize(\"NFD\").replace(/[\u0300-\u036f]/g, \"\")}}"
+              "value": "={{$json['message']['text'].trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')}}"
             },
             {
               "name": "chatId",
-              "value": "={{$json[\"message\"][\"chat\"][\"id\"]}}"
+              "value": "={{$json['message']['chat']['id']}}"
             }
           ]
         },
@@ -42,12 +42,52 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json['queue'] !== '' && !/^\\d+$/.test($json['queue']) && $json['queue'].length <= 100}}",
+              "operation": "equal",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-input-valid",
+      "name": "IF Input Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{$json['chatId']}}",
+        "text": "⚠️ Entrada inválida. Digite apenas o nome de uma cidade (ex.: São Paulo).",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "telegram-send-validation-error",
+      "name": "Telegram Send Validation Error",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [860, 480],
+      "credentials": {
+        "telegramApi": {
+          "id": "1",
+          "name": "Telegram API"
+        }
+      }
+    },
+    {
+      "parameters": {
         "requestMethod": "GET",
         "url": "https://api.openweathermap.org/data/2.5/weather",
         "sendQuery": true,
         "queryParametersUi": {
           "parameter": [
-            { "name": "q", "value": "={{$json[\"queue\"]}}" },
+            { "name": "q", "value": "={{$json['queue']}}" },
             { "name": "units", "value": "metric" },
             { "name": "lang", "value": "pt_br" },
             { "name": "appid", "value": "={{$env.OPENWEATHER_API_KEY}}" }
@@ -59,7 +99,7 @@
       "name": "OpenWeather Request",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 1,
-      "position": [640, 300],
+      "position": [860, 180],
       "continueOnFail": true
     },
     {
@@ -67,7 +107,7 @@
         "conditions": {
           "boolean": [
             {
-              "value1": "={{!!$json[\"main\"]}}",
+              "value1": "={{$json['cod'] === 200}}",
               "operation": "equal",
               "value2": true
             }
@@ -78,21 +118,23 @@
       "name": "IF Success",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [860, 300]
+      "position": [1080, 180]
     },
     {
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
-        "chatId": "={{$node[\"Set queue\"].json[\"chatId\"]}}",
-        "text": "=\uD83C\uDF24\uFE0F A temperatura em {{$json[\"name\"]}} \u00e9 de {{Math.round($json[\"main\"][\"temp\"])}}°C.\n\uD83D\uDCA7 Umidade: {{$json[\"main\"][\"humidity\"]}}%\n\uD83C\uDF2C\uFE0F Vento: {{$json[\"wind\"][\"speed\"]}} m/s\n\uD83C\uDF25\uFE0F {{$json[\"weather\"][0][\"description\"]}}",
-        "additionalFields": {}
+        "chatId": "={{$node['Set queue'].json['chatId']}}",
+        "text": "=🌤️ Previsão para <b>{{$json['name']}}</b>:\n\n🌡️ Temperatura: <b>{{Math.round($json['main']['temp'])}}°C</b>\n🤔 Sensação Térmica: <b>{{Math.round($json['main']['feels_like'])}}°C</b>\n⬇️ Mín: {{Math.round($json['main']['temp_min'])}}°C  |  ⬆️ Máx: {{Math.round($json['main']['temp_max'])}}°C\n💧 Umidade: {{$json['main']['humidity']}}%\n🌬️ Vento: {{Math.round($json['wind']['speed'])}} m/s\n🌥️ {{$json['weather'][0]['description']}}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
       },
       "id": "telegram-send-success",
       "name": "Telegram Send Success",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1080, 180],
+      "position": [1300, 60],
       "credentials": {
         "telegramApi": {
           "id": "1",
@@ -104,15 +146,17 @@
       "parameters": {
         "resource": "message",
         "operation": "sendMessage",
-        "chatId": "={{$node[\"Set queue\"].json[\"chatId\"]}}",
-        "text": "❌ Cidade não encontrada. Use o formato Cidade,UF (ex.: São Paulo,SP).",
-        "additionalFields": {}
+        "chatId": "={{$node['Set queue'].json['chatId']}}",
+        "text": "={{$json['cod'] == '404' || $json['cod'] == 404 ? '❌ Cidade não encontrada. Tente novamente com o nome correto (ex.: São Paulo ou Rio de Janeiro).' : '⚠️ Erro ao consultar a API de clima (código: ' + $json['cod'] + '). Verifique sua chave de API e tente novamente.'}}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
       },
       "id": "telegram-send-error",
       "name": "Telegram Send Error",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1,
-      "position": [1080, 420],
+      "position": [1300, 300],
       "credentials": {
         "telegramApi": {
           "id": "1",
@@ -137,7 +181,25 @@
       "main": [
         [
           {
+            "node": "IF Input Valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF Input Valid": {
+      "main": [
+        [
+          {
             "node": "OpenWeather Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Send Validation Error",
             "type": "main",
             "index": 0
           }
